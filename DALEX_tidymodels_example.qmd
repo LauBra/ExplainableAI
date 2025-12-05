@@ -1,0 +1,177 @@
+
+## Explainable AI
+
+You are going to see the power of the `DALEX` package <https://github.com/ModelOriented/DALEX>, where the methods seen in class AND MORE, are encoded. 
+
+First, make sure you have the packages installed: 
+
+
+```{r, message=FALSE}
+# Install required packages
+#install.packages(c("tidymodels", "mlbench", "DALEX", "DALEXtra", "modelStudio"))
+```
+
+Now load them into our session: 
+
+```{r, message=FALSE}
+library(tidymodels)
+library(mlbench)
+library(DALEX)
+library(DALEXtra)
+library(modelStudio)
+```
+
+Now we are going to fit a random forest model (black box) on our well known PimaIndiansDiabetes dataset. We want to predict diabetes, so we are building a classification predictive model. 
+
+```{r}
+# Load and prepare data
+data("PimaIndiansDiabetes")
+
+PimaIndiansDiabetes <- PimaIndiansDiabetes %>%
+       mutate(diabetes = as.factor(ifelse(diabetes == "pos", 1, 0)))
+```
+
+Classic train test split: 
+
+```{r}
+set.seed(123)
+
+data_split <- initial_split(PimaIndiansDiabetes, prop = 0.8)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+```
+
+Pre-processing 
+
+```{r}
+# Define recipe and model
+diabetes_recipe <- recipe(diabetes ~ ., data = train_data) %>%
+  step_normalize(all_numeric()) 
+
+```
+
+Model fitting (no hyperparameter tuning here)
+
+```{r}
+rf_model <- rand_forest(mtry = 3, trees = 500, min_n = 10) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+# Create and fit workflow
+rf_workflow <- workflow() %>%
+  add_recipe(diabetes_recipe) %>%
+  add_model(rf_model)
+
+rf_fit <- fit(rf_workflow, data = train_data)
+```
+
+Evaluate model on test set
+
+```{r}
+
+rf_predictions <- predict(rf_fit, new_data = test_data, type = "prob") %>%
+  bind_cols(predict(rf_fit, new_data = test_data)) %>%
+  bind_cols(test_data)
+
+metrics <- rf_predictions %>%
+  metrics(truth = diabetes, estimate = .pred_class)
+
+print(metrics)
+```
+And now, lets start with XAI. We are going to use the `DALEX` package. As it is so useful, there is an integration with tidymodels <https://www.tmwr.org/explain.html>
+
+### DALEX Explainer
+
+```{r}
+
+explainer <- explain_tidymodels(
+  rf_fit,
+  data = test_data %>% select(-diabetes),
+  y = as.numeric(test_data$diabetes),
+  label = "Random Forest (tidymodels)"
+)
+```
+Now that we have fit the explainer, we can ask for specific methods to be assessed. For instance: 
+
+Feature Importance: global 
+
+```{r}
+plot(model_parts(explainer))
+```
+Partial Dependence Plots
+
+```{r}
+plot(model_profile(explainer, variable =  "glucose", type = "partial"))
+```
+```{r}
+glucose <- model_profile(explainer, variable =  "glucose", type = "partial")
+pedigree <- model_profile(explainer, variable =  "pedigree", type = "partial")
+
+plot(glucose, pedigree)
+```
+Partial Dependence plots with ICE!
+
+```{r}
+plot(glucose, geom = "profiles") + 
+    ggtitle("Ceteris-paribus and partial-dependence profiles for glucose") 
+```
+We can also look at local explanations by picking a single observation. In this case we are wanting to understand the prediction for this single observation through SHAPLEY values.
+
+The specific observation is: 
+
+```{r}
+new_observation <- test_data[1, -ncol(test_data)]
+print(new_observation)
+```
+Shapley: 
+
+```{r}
+
+new_observation <- test_data[1, -ncol(test_data)]
+local_explanation <- predict_parts(explainer, new_observation, type = "shap")
+plot(local_explanation)
+```
+
+Want everything together? Try this out! A summary of everything!
+
+```{r}
+#modelStudio(explainer)
+```
+
+But we also have other packages. For example here we can find global variable importance taking advantage of the out of bag (OOB) error we can calculate in random forest (model specific approach)
+
+```{r}
+library(vip)
+```
+
+Lets refit the model, but with `importance = "impurity")` in `set_engine`
+
+
+```{r}
+# Define recipe and model
+diabetes_recipe <- recipe(diabetes ~ ., data = train_data) %>%
+  step_normalize(all_numeric())
+
+rf_model <- rand_forest(mtry = 3, trees = 500, min_n = 10) %>%
+ set_engine("ranger", importance = "impurity") %>%
+  set_mode("classification")
+
+# Create and fit workflow
+rf_workflow <- workflow() %>%
+  add_recipe(diabetes_recipe) %>%
+  add_model(rf_model)
+
+rf_fit <- fit(rf_workflow, data = train_data)
+```
+
+```{r}
+rf_model_fitted <- extract_fit_parsnip(rf_fit)$fit
+
+# Use vip to plot variable importance
+vip(rf_model_fitted, num_features = 10)
+```
+
+Now uncomment the ModelStudio chunk and see what happens. 
+Be sure to check this out too <https://arena.drwhy.ai/?app> 
+And for python `DALEX` is also available: <https://arena.drwhy.ai/docs/guide/installation>
+

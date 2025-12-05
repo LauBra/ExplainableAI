@@ -1,0 +1,155 @@
+[
+  {
+    "objectID": "DALEX_tidymodels_example.html",
+    "href": "DALEX_tidymodels_example.html",
+    "title": "",
+    "section": "",
+    "text": "Code",
+    "crumbs": [
+      "Explainable AI"
+    ]
+  },
+  {
+    "objectID": "DALEX_tidymodels_example.html#explainable-ai",
+    "href": "DALEX_tidymodels_example.html#explainable-ai",
+    "title": "",
+    "section": "Explainable AI",
+    "text": "Explainable AI\nYou are going to see the power of the DALEX package https://github.com/ModelOriented/DALEX, where the methods seen in class AND MORE, are encoded.\nFirst, make sure you have the packages installed:\n\n# Install required packages\n#install.packages(c(\"tidymodels\", \"mlbench\", \"DALEX\", \"DALEXtra\", \"modelStudio\"))\n\nNow load them into our session:\n\nlibrary(tidymodels)\nlibrary(mlbench)\nlibrary(DALEX)\nlibrary(DALEXtra)\nlibrary(modelStudio)\n\nNow we are going to fit a random forest model (black box) on our well known PimaIndiansDiabetes dataset. We want to predict diabetes, so we are building a classification predictive model.\n\n# Load and prepare data\ndata(\"PimaIndiansDiabetes\")\n\nPimaIndiansDiabetes &lt;- PimaIndiansDiabetes %&gt;%\n       mutate(diabetes = as.factor(ifelse(diabetes == \"pos\", 1, 0)))\n\nClassic train test split:\n\nset.seed(123)\n\ndata_split &lt;- initial_split(PimaIndiansDiabetes, prop = 0.8)\ntrain_data &lt;- training(data_split)\ntest_data &lt;- testing(data_split)\n\nPre-processing\n\n# Define recipe and model\ndiabetes_recipe &lt;- recipe(diabetes ~ ., data = train_data) %&gt;%\n  step_normalize(all_numeric()) \n\nModel fitting (no hyperparameter tuning here)\n\nrf_model &lt;- rand_forest(mtry = 3, trees = 500, min_n = 10) %&gt;%\n  set_engine(\"ranger\") %&gt;%\n  set_mode(\"classification\")\n\n# Create and fit workflow\nrf_workflow &lt;- workflow() %&gt;%\n  add_recipe(diabetes_recipe) %&gt;%\n  add_model(rf_model)\n\nrf_fit &lt;- fit(rf_workflow, data = train_data)\n\nEvaluate model on test set\n\nrf_predictions &lt;- predict(rf_fit, new_data = test_data, type = \"prob\") %&gt;%\n  bind_cols(predict(rf_fit, new_data = test_data)) %&gt;%\n  bind_cols(test_data)\n\nmetrics &lt;- rf_predictions %&gt;%\n  metrics(truth = diabetes, estimate = .pred_class)\n\nprint(metrics)\n\n# A tibble: 2 × 3\n  .metric  .estimator .estimate\n  &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;\n1 accuracy binary         0.779\n2 kap      binary         0.487\n\n\nAnd now, lets start with XAI. We are going to use the DALEX package. As it is so useful, there is an integration with tidymodels https://www.tmwr.org/explain.html\nDALEX Explainer\n\nexplainer &lt;- explain_tidymodels(\n  rf_fit,\n  data = test_data %&gt;% select(-diabetes),\n  y = as.numeric(test_data$diabetes),\n  label = \"Random Forest (tidymodels)\"\n)\n\nPreparation of a new explainer is initiated\n  -&gt; model label       :  Random Forest (tidymodels) \n  -&gt; data              :  154  rows  8  cols \n  -&gt; target variable   :  154  values \n  -&gt; predict function  :  yhat.workflow  will be used (  default  )\n  -&gt; predicted values  :  No value for predict function target column. (  default  )\n  -&gt; model_info        :  package tidymodels , ver. 1.1.0 , task classification (  default  ) \n  -&gt; predicted values  :  numerical, min =  0.001483333 , mean =  0.3251478 , max =  0.8915556  \n  -&gt; residual function :  difference between y and yhat (  default  )\n  -&gt; residuals         :  numerical, min =  0.1286262 , mean =  1.012515 , max =  1.910279  \n  A new explainer has been created!  \n\n\nNow that we have fit the explainer, we can ask for specific methods to be assessed. For instance:\nFeature Importance: global\n\nplot(model_parts(explainer))\n\n\n\n\n\n\n\nPartial Dependence Plots\n\nplot(model_profile(explainer, variable =  \"glucose\", type = \"partial\"))\n\n\n\n\n\n\n\n\nglucose &lt;- model_profile(explainer, variable =  \"glucose\", type = \"partial\")\npedigree &lt;- model_profile(explainer, variable =  \"pedigree\", type = \"partial\")\n\nplot(glucose, pedigree)\n\n\n\n\n\n\n\nPartial Dependence plots with ICE!\n\nplot(glucose, geom = \"profiles\") + \n    ggtitle(\"Ceteris-paribus and partial-dependence profiles for glucose\") \n\n\n\n\n\n\n\nWe can also look at local explanations by picking a single observation. In this case we are wanting to understand the prediction for this single observation through SHAPLEY values.\nThe specific observation is:\n\nnew_observation &lt;- test_data[1, -ncol(test_data)]\nprint(new_observation)\n\n  pregnant glucose pressure triceps insulin mass pedigree age\n1        6     148       72      35       0 33.6    0.627  50\n\n\nShapley:\n\nnew_observation &lt;- test_data[1, -ncol(test_data)]\nlocal_explanation &lt;- predict_parts(explainer, new_observation, type = \"shap\")\nplot(local_explanation)\n\n\n\n\n\n\n\nWant everything together? Try this out! A summary of everything!\n\n#modelStudio(explainer)\n\nBut we also have other packages. For example here we can find global variable importance taking advantage of the out of bag (OOB) error we can calculate in random forest (model specific approach)\n\nlibrary(vip)\n\n\nAttaching package: 'vip'\n\n\nThe following object is masked from 'package:utils':\n\n    vi\n\n\nLets refit the model, but with importance = \"impurity\") in set_engine\n\n# Define recipe and model\ndiabetes_recipe &lt;- recipe(diabetes ~ ., data = train_data) %&gt;%\n  step_normalize(all_numeric())\n\nrf_model &lt;- rand_forest(mtry = 3, trees = 500, min_n = 10) %&gt;%\n set_engine(\"ranger\", importance = \"impurity\") %&gt;%\n  set_mode(\"classification\")\n\n# Create and fit workflow\nrf_workflow &lt;- workflow() %&gt;%\n  add_recipe(diabetes_recipe) %&gt;%\n  add_model(rf_model)\n\nrf_fit &lt;- fit(rf_workflow, data = train_data)\n\n\nrf_model_fitted &lt;- extract_fit_parsnip(rf_fit)$fit\n\n# Use vip to plot variable importance\nvip(rf_model_fitted, num_features = 10)\n\n\n\n\n\n\n\nNow uncomment the ModelStudio chunk and see what happens. Be sure to check this out too https://arena.drwhy.ai/?app And for python DALEX is also available: https://arena.drwhy.ai/docs/guide/installation",
+    "crumbs": [
+      "Explainable AI"
+    ]
+  },
+  {
+    "objectID": "Extra.html",
+    "href": "Extra.html",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "",
+    "text": "For a bit more insight, you can go through this tutorial obtained from here: https://github.com/ModelOriented/DALEX-docs/blob/master/vignettes/Comparison%20between%20breakdown%2C%20lime%2C%20shapley.Rmd Should take 2 mins to run.\nIn the vignette below we will see how methods implemented in DALEX R packages focuses on variables in selected model. For our model we consider Break Down, LIME and Shapley values.\nlibrary(DALEX)\nlibrary(lime)"
+  },
+  {
+    "objectID": "Extra.html#break-down",
+    "href": "Extra.html#break-down",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "Break Down",
+    "text": "Break Down\nBreak Down is the methodology delevoped by Przemysław Biecek and Mateusz Staniak. A description of the method can be found here.\nThis methodology is implemented by Przemysław Biecek and Mateusz Staniak in the R package breakDown. Currently available in the R package DALEX.\nThe breakDown package is a model agnostic tool for decomposition of predictions from black boxes. Break Down Table shows contributions of every variable to a final prediction. Break Down Profile presents variable contributions in a concise graphical way."
+  },
+  {
+    "objectID": "Extra.html#lime-local-interpretable-model-agnostic-explanations",
+    "href": "Extra.html#lime-local-interpretable-model-agnostic-explanations",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "LIME (Local Interpretable Model-agnostic Explanations)",
+    "text": "LIME (Local Interpretable Model-agnostic Explanations)\nLIME is the methodology developed by Marco Tulio Ribeiro, Sameer Singh, and Carlos Guestrin. A description of the method can be found here.\nThe purpose of LIME is to explain the predictions of black box classifiers. What this means is that for any given prediction and any given classifier it is able to determine a small set of features in the original data that has driven the outcome of the prediction. Using here package lime is an R port of the Python lime package (https://github.com/marcotcr/lime) developed by the authors of the lime approach for black-box model explanations."
+  },
+  {
+    "objectID": "Extra.html#shapley-value",
+    "href": "Extra.html#shapley-value",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "Shapley value",
+    "text": "Shapley value\nA methodology based on the use of Shapley value known from game theory to explain predictions is developed by Scott Lundberg and Su-In Lee. A description of the method can be found here.\nThe Shapley value is a method that gives a solution to the following problem: A coalition of players play a game, for which they get a payout, but it is not clear how to distribute the payout fairly among the players. The Shapley value solves this problem by trying out different coalitions of players to decide how much each player changes the amount of the payout. What does this have to do with machine learning? In machine learning, the features (= players) work together to get the payout (=predicted value). The Shapley value tells us, how much each feature contributed to the prediction.\nWe use Shapley value implementation in the R package DALEX."
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2--1",
+    "href": "Extra.html#x1--1-x2--1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = -1",
+    "text": "x1 = -1, x2 = -1\nExplainers\n\nnew_observation_1 &lt;- data.frame(x1 = -1, x2 = -1)\n\ndf_test &lt;- rbind(df_test, data.frame(y1 = sign(-1) + sign(-1) + rnorm(1) , y2 = sign(-1)*sign(-1) + rnorm(1), x1 = -1, x2 = -1),  data.frame(y1 = sign(-1) + sign(1) + rnorm(1) , y2 = sign(-1)*sign(1) + rnorm(1), x1 = -1, x2 = 1),\n                 data.frame(y1 = sign(0) + sign(0) + rnorm(1) , y2 = sign(0)*sign(0) + rnorm(1), x1 = 0, x2 = 0))\n\nbd_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_1, type = \"break_down\")\n\nexplainer &lt;- lime(df_train[,-c(1,2)], regr_rf_y1)\nlime_new_observation_1 &lt;- lime::explain(new_observation_1, explainer, n_features = 2)\n\nsh_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_1, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_1)\n\n\n\nplot_features(lime_new_observation_1)\n\n\n\nlime_new_observation_1\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1        0.301           0.260            -2.06 x1     \n2 regression 1        0.301           0.260            -2.06 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_1)\n\n\n\n\nWe see that in all methods both, x1 and x2 contradicts the predicted value of y1."
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2-1",
+    "href": "Extra.html#x1--1-x2-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = 1",
+    "text": "x1 = -1, x2 = 1\nExplainers\n\nnew_observation_2 &lt;- data.frame(x1 = -1, x2 = 1)\n\nbd_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_2, type = \"break_down\")\n\nlime_new_observation_2 &lt;- lime::explain(new_observation_2, explainer, n_features = 2)\n\nsh_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_2, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_2)\n\n\n\nplot_features(lime_new_observation_2)\n\n\n\nlime_new_observation_2\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1        0.168           0.441            0.288 x1     \n2 regression 1        0.168           0.441            0.288 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_2)\n\n\n\n\nFor all methods we see that variable x1 contradicts the prediction and x2 supports it."
+  },
+  {
+    "objectID": "Extra.html#x1-0-x2-0",
+    "href": "Extra.html#x1-0-x2-0",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = 0, x2 = 0",
+    "text": "x1 = 0, x2 = 0\nExplainers\n\nnew_observation_3 &lt;- data.frame(x1 = 0, x2 = 0)\n\nbd_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_3, type = \"break_down\")\n\nlime_new_observation_3 &lt;- lime::explain(new_observation_3, explainer, n_features = 2)\n\nsh_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_3, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_3)\n\n\n\nplot_features(lime_new_observation_3)\n\n\n\nlime_new_observation_3\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1        0.306          -0.733             1.86 x1     \n2 regression 1        0.306          -0.733             1.86 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_3)\n\n\n\n\nFor Break Down and Shapley value we see that both variables contradicts the prediction, but in LIME method we see that both variables support the value of y1."
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2--1-1",
+    "href": "Extra.html#x1--1-x2--1-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = -1",
+    "text": "x1 = -1, x2 = -1\nExplainers\n\nnew_observation_1 &lt;- data.frame(x1 = -1, x2 = -1)\n\nbd_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_1, type = \"break_down\")\n\nexplainer &lt;- lime(df_train[,-c(1,2)], regr_rf_y2)\nlime_new_observation_1 &lt;- lime::explain(new_observation_1, explainer, n_features = 2)\n\nsh_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_1, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_1)\n\n\n\nplot_features(lime_new_observation_1)\n\n\n\nlime_new_observation_1\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1       0.0415          -0.239            0.367 x1     \n2 regression 1       0.0415          -0.239            0.367 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_1)\n\n\n\n\nWe see that in LIME and Shapley value x1 and x2 support the predicted value of y2. In Break Down x1 supports and x2 contradicts prediction."
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2-1-1",
+    "href": "Extra.html#x1--1-x2-1-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = 1",
+    "text": "x1 = -1, x2 = 1\nExplainers\n\nnew_observation_2 &lt;- data.frame(x1 = -1, x2 = 1)\n\nbd_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_2, type = \"break_down\")\n\nlime_new_observation_2 &lt;- lime::explain(new_observation_2, explainer, n_features = 2)\n\nsh_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_2, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_2)\n\n\n\nplot_features(lime_new_observation_2)\n\n\n\nlime_new_observation_2\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1       0.0166          0.0878           -0.622 x1     \n2 regression 1       0.0166          0.0878           -0.622 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_2)\n\n\n\n\nFor all methods we see that both variables contradict the prediction."
+  },
+  {
+    "objectID": "Extra.html#x1-0-x2-0-1",
+    "href": "Extra.html#x1-0-x2-0-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = 0, x2 = 0",
+    "text": "x1 = 0, x2 = 0\nExplainers\n\nnew_observation_3 &lt;- data.frame(x1 = 0, x2 = 0)\n\nbd_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_3, type = \"break_down\")\n\nlime_new_observation_3 &lt;- lime::explain(new_observation_3, explainer, n_features = 2)\n\nsh_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_3, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_3)\n\n\n\nplot_features(lime_new_observation_3)\n\n\n\nlime_new_observation_3\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1      0.00291          0.0170           -0.113 x1     \n2 regression 1      0.00291          0.0170           -0.113 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_3)\n\n\n\n\nFor Break Down and Shapley values we see that both variables support the prediction, but in LIME method we see that both variables contradict the value of y2."
+  },
+  {
+    "objectID": "Extra.html#break-down-1",
+    "href": "Extra.html#break-down-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "Break Down",
+    "text": "Break Down\nBreak Down is the methodology delevoped by Przemysław Biecek and Mateusz Staniak. A description of the method can be found here.\nThis methodology is implemented by Przemysław Biecek and Mateusz Staniak in the R package breakDown. Currently available in the R package DALEX.\nThe breakDown package is a model agnostic tool for decomposition of predictions from black boxes. Break Down Table shows contributions of every variable to a final prediction. Break Down Profile presents variable contributions in a concise graphical way."
+  },
+  {
+    "objectID": "Extra.html#lime-local-interpretable-model-agnostic-explanations-1",
+    "href": "Extra.html#lime-local-interpretable-model-agnostic-explanations-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "LIME (Local Interpretable Model-agnostic Explanations)",
+    "text": "LIME (Local Interpretable Model-agnostic Explanations)\nLIME is the methodology developed by Marco Tulio Ribeiro, Sameer Singh, and Carlos Guestrin. A description of the method can be found here.\nThe purpose of LIME is to explain the predictions of black box classifiers. What this means is that for any given prediction and any given classifier it is able to determine a small set of features in the original data that has driven the outcome of the prediction. Using here package lime is an R port of the Python lime package (https://github.com/marcotcr/lime) developed by the authors of the lime approach for black-box model explanations."
+  },
+  {
+    "objectID": "Extra.html#shapley-value-1",
+    "href": "Extra.html#shapley-value-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "Shapley value",
+    "text": "Shapley value\nA methodology based on the use of Shapley value known from game theory to explain predictions is developed by Scott Lundberg and Su-In Lee. A description of the method can be found here.\nThe Shapley value is a method that gives a solution to the following problem: A coalition of players play a game, for which they get a payout, but it is not clear how to distribute the payout fairly among the players. The Shapley value solves this problem by trying out different coalitions of players to decide how much each player changes the amount of the payout. What does this have to do with machine learning? In machine learning, the features (= players) work together to get the payout (=predicted value). The Shapley value tells us, how much each feature contributed to the prediction.\nWe use Shapley value implementation in the R package DALEX."
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2--1-2",
+    "href": "Extra.html#x1--1-x2--1-2",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = -1",
+    "text": "x1 = -1, x2 = -1\nExplainers\nquarto-executable-code-5450563D\nnew_observation_1 &lt;- data.frame(x1 = -1, x2 = -1)\n\ndf_test &lt;- rbind(df_test, data.frame(y1 = sign(-1) + sign(-1) + rnorm(1) , y2 = sign(-1)*sign(-1) + rnorm(1), x1 = -1, x2 = -1),  data.frame(y1 = sign(-1) + sign(1) + rnorm(1) , y2 = sign(-1)*sign(1) + rnorm(1), x1 = -1, x2 = 1),\n                 data.frame(y1 = sign(0) + sign(0) + rnorm(1) , y2 = sign(0)*sign(0) + rnorm(1), x1 = 0, x2 = 0))\n\nbd_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_1, type = \"break_down\")\n\nexplainer &lt;- lime(df_train[,-c(1,2)], regr_rf_y1)\nlime_new_observation_1 &lt;- lime::explain(new_observation_1, explainer, n_features = 2)\n\nsh_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_1, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_1)\nplot_features(lime_new_observation_1)\nlime_new_observation_1\nplot(sh_new_observation_1)\nWe see that in all methods both, x1 and x2 contradicts the predicted value of y1."
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2-1-2",
+    "href": "Extra.html#x1--1-x2-1-2",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = 1",
+    "text": "x1 = -1, x2 = 1\nExplainers\nquarto-executable-code-5450563D\nnew_observation_2 &lt;- data.frame(x1 = -1, x2 = 1)\n\nbd_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_2, type = \"break_down\")\n\nlime_new_observation_2 &lt;- lime::explain(new_observation_2, explainer, n_features = 2)\n\nsh_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_2, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_2)\nplot_features(lime_new_observation_2)\nlime_new_observation_2\nplot(sh_new_observation_2)\nFor all methods we see that variable x1 contradicts the prediction and x2 supports it."
+  },
+  {
+    "objectID": "Extra.html#x1-0-x2-0-2",
+    "href": "Extra.html#x1-0-x2-0-2",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = 0, x2 = 0",
+    "text": "x1 = 0, x2 = 0\nExplainers\nquarto-executable-code-5450563D\nnew_observation_3 &lt;- data.frame(x1 = 0, x2 = 0)\n\nbd_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_3, type = \"break_down\")\n\nlime_new_observation_3 &lt;- lime::explain(new_observation_3, explainer, n_features = 2)\n\nsh_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_3, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_3)\nplot_features(lime_new_observation_3)\nlime_new_observation_3\nplot(sh_new_observation_3)\nFor Break Down and Shapley value we see that both variables contradicts the prediction, but in LIME method we see that both variables support the value of y1."
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2--1-3",
+    "href": "Extra.html#x1--1-x2--1-3",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = -1",
+    "text": "x1 = -1, x2 = -1\nExplainers\nquarto-executable-code-5450563D\nnew_observation_1 &lt;- data.frame(x1 = -1, x2 = -1)\n\nbd_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_1, type = \"break_down\")\n\nexplainer &lt;- lime(df_train[,-c(1,2)], regr_rf_y2)\nlime_new_observation_1 &lt;- lime::explain(new_observation_1, explainer, n_features = 2)\n\nsh_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_1, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_1)\nplot_features(lime_new_observation_1)\nlime_new_observation_1\nplot(sh_new_observation_1)\nWe see that in LIME and Shapley value x1 and x2 support the predicted value of y2. In Break Down x1 supports and x2 contradicts prediction."
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2-1-3",
+    "href": "Extra.html#x1--1-x2-1-3",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = 1",
+    "text": "x1 = -1, x2 = 1\nExplainers\nquarto-executable-code-5450563D\nnew_observation_2 &lt;- data.frame(x1 = -1, x2 = 1)\n\nbd_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_2, type = \"break_down\")\n\nlime_new_observation_2 &lt;- lime::explain(new_observation_2, explainer, n_features = 2)\n\nsh_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_2, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_2)\nplot_features(lime_new_observation_2)\nlime_new_observation_2\nplot(sh_new_observation_2)\nFor all methods we see that both variables contradict the prediction."
+  },
+  {
+    "objectID": "Extra.html#x1-0-x2-0-3",
+    "href": "Extra.html#x1-0-x2-0-3",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = 0, x2 = 0",
+    "text": "x1 = 0, x2 = 0\nExplainers\nquarto-executable-code-5450563D\nnew_observation_3 &lt;- data.frame(x1 = 0, x2 = 0)\n\nbd_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_3, type = \"break_down\")\n\nlime_new_observation_3 &lt;- lime::explain(new_observation_3, explainer, n_features = 2)\n\nsh_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_3, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_3)\nplot_features(lime_new_observation_3)\nlime_new_observation_3\nplot(sh_new_observation_3)\nFor Break Down and Shapley values we see that both variables support the prediction, but in LIME method we see that both variables contradict the value of y2."
+  }
+]
