@@ -29,6 +29,7 @@ For our model we consider Break Down, LIME and Shapley values.
 ```{r}
 library(DALEX)
 library(lime)
+library(randomForest)
 ```
 
 

@@ -1,0 +1,308 @@
+[
+  {
+    "objectID": "pima_rf_shap_pyth_example.html",
+    "href": "pima_rf_shap_pyth_example.html",
+    "title": "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)",
+    "section": "",
+    "text": "This document shows how to compute Random Forest variable importance and SHAP values for the Pima Indians Diabetes dataset using Python.\nWe will:\n\nLoad the dataset.\nFit a RandomForestClassifier.\nPlot impurity-based variable importance (VIP).\nUse shap to compute and visualise SHAP values.\n\nlibrary(reticulate)\n\n# one-off setup (if you haven't done it yet)\n# install_miniconda()\n\n##conda_create(\n##  envname = \"hds-python\",\n##  python_version = \"3.11\",\n##  packages = c(\"numpy\", \"pandas\", \"matplotlib\", \"seaborn\", \"scikit-learn\")\n##)\n\nuse_condaenv(\"hds-python\", required = TRUE)\n#py_config()\n\n#conda_install(\"hds-python\", c(\"shap\"))\n\n\nCode\nimport pandas as pd\nimport numpy as np\n\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import roc_auc_score\nfrom sklearn.inspection import permutation_importance\n\nimport matplotlib.pyplot as plt\n\nimport shap",
+    "crumbs": [
+      "Explainable AI",
+      "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)"
+    ]
+  },
+  {
+    "objectID": "pima_rf_shap_pyth_example.html#setup",
+    "href": "pima_rf_shap_pyth_example.html#setup",
+    "title": "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)",
+    "section": "",
+    "text": "This document shows how to compute Random Forest variable importance and SHAP values for the Pima Indians Diabetes dataset using Python.\nWe will:\n\nLoad the dataset.\nFit a RandomForestClassifier.\nPlot impurity-based variable importance (VIP).\nUse shap to compute and visualise SHAP values.\n\nlibrary(reticulate)\n\n# one-off setup (if you haven't done it yet)\n# install_miniconda()\n\n##conda_create(\n##  envname = \"hds-python\",\n##  python_version = \"3.11\",\n##  packages = c(\"numpy\", \"pandas\", \"matplotlib\", \"seaborn\", \"scikit-learn\")\n##)\n\nuse_condaenv(\"hds-python\", required = TRUE)\n#py_config()\n\n#conda_install(\"hds-python\", c(\"shap\"))\n\n\nCode\nimport pandas as pd\nimport numpy as np\n\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import roc_auc_score\nfrom sklearn.inspection import permutation_importance\n\nimport matplotlib.pyplot as plt\n\nimport shap",
+    "crumbs": [
+      "Explainable AI",
+      "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)"
+    ]
+  },
+  {
+    "objectID": "pima_rf_shap_pyth_example.html#load-the-pima-indians-diabetes-data",
+    "href": "pima_rf_shap_pyth_example.html#load-the-pima-indians-diabetes-data",
+    "title": "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)",
+    "section": "2. Load the Pima Indians Diabetes data",
+    "text": "2. Load the Pima Indians Diabetes data\nWe use a common version of the dataset from GitHub.\n\n\nCode\nurl = \"https://raw.githubusercontent.com/npradaschnor/Pima-Indians-Diabetes-Dataset/master/diabetes.csv\"\npima = pd.read_csv(url)\n\npima.head()\n\n\n\n\n\n\n\n\n\nPregnancies\nGlucose\nBloodPressure\nSkinThickness\nInsulin\nBMI\nDiabetesPedigreeFunction\nAge\nOutcome\n\n\n\n\n0\n6\n148\n72\n35\n0\n33.6\n0.627\n50\n1\n\n\n1\n1\n85\n66\n29\n0\n26.6\n0.351\n31\n0\n\n\n2\n8\n183\n64\n0\n0\n23.3\n0.672\n32\n1\n\n\n3\n1\n89\n66\n23\n94\n28.1\n0.167\n21\n0\n\n\n4\n0\n137\n40\n35\n168\n43.1\n2.288\n33\n1\n\n\n\n\n\n\n\nThe outcome column is called Outcome (1 = diabetes, 0 = no diabetes).\n\n\nCode\nX = pima.drop(columns=[\"Outcome\"])\ny = pima[\"Outcome\"]\n\nfeature_names = X.columns.tolist()",
+    "crumbs": [
+      "Explainable AI",
+      "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)"
+    ]
+  },
+  {
+    "objectID": "pima_rf_shap_pyth_example.html#train-test-split-and-random-forest-model",
+    "href": "pima_rf_shap_pyth_example.html#train-test-split-and-random-forest-model",
+    "title": "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)",
+    "section": "3. Train / test split and Random Forest model",
+    "text": "3. Train / test split and Random Forest model\n\n\nCode\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.3, random_state=123, stratify=y\n)\n\nrf = RandomForestClassifier(\n    n_estimators=300,\n    max_depth=None,\n    random_state=123,\n    n_jobs=-1\n)\n\nrf.fit(X_train, y_train)\n\ny_pred_proba = rf.predict_proba(X_test)[:, 1]\nauc = roc_auc_score(y_test, y_pred_proba)\nauc\n\n\n0.8390946502057612",
+    "crumbs": [
+      "Explainable AI",
+      "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)"
+    ]
+  },
+  {
+    "objectID": "pima_rf_shap_pyth_example.html#random-forest-variable-importance-impurity-based",
+    "href": "pima_rf_shap_pyth_example.html#random-forest-variable-importance-impurity-based",
+    "title": "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)",
+    "section": "4. Random Forest Variable Importance (impurity-based)",
+    "text": "4. Random Forest Variable Importance (impurity-based)\nHere we use the standard feature_importances_ attribute from scikit-learn, which reflects the average decrease in Gini impurity contributed by each feature.\n\n\nCode\nimportances = rf.feature_importances_\nvip = pd.Series(importances, index=feature_names).sort_values(ascending=True)\n\nplt.figure(figsize=(6, 4))\nvip.plot(kind=\"barh\")\nplt.xlabel(\"Mean decrease in impurity\")\nplt.title(\"Random Forest Variable Importance (Pima Indians)\")\nplt.tight_layout()\nplt.show()\n\n\n\n\n\n\n\n\n\n\n\nCode\nresult = permutation_importance(\nrf,\nX_test,\ny_test,\nn_repeats=20,\nrandom_state=123,\nscoring=\"roc_auc\",\nn_jobs=-1\n)\n\n\nperm_importance = pd.Series(\nresult.importances_mean,\nindex=feature_names\n).sort_values(ascending=True)\ndisplay(perm_importance)\nperm_importance.plot(kind=\"barh\")\nplt.xlabel(\"Mean decrease in ROC AUC\\n(permuting each feature on test set)\")\nplt.title(\"Permutation Importance (Random Forest)\")\nplt.tight_layout()\nplt.show()\n\n\nSkinThickness              -0.001235\nBloodPressure               0.001253\nDiabetesPedigreeFunction    0.008084\nInsulin                     0.009165\nPregnancies                 0.014358\nBMI                         0.031938\nAge                         0.034424\nGlucose                     0.127516\ndtype: float64\n\n\n\n\n\n\n\n\n\n\nSHAP values with TreeExplainer (new 3D API) —————————\n\n\n\nCode\nexplainer = shap.TreeExplainer(rf)\nshap_values = explainer.shap_values(X_train) # shape: (n_samples, n_features, n_outputs)\nprint(\"shap_values.shape:\", shap_values.shape)\nprint(\"X_train.shape:\", X_train.shape)\nprint(\"expected_value:\", explainer.expected_value)\n\n\nshap_values.shape: (537, 8, 2)\nX_train.shape: (537, 8)\nexpected_value: [0.65040348 0.34959652]\n\n\nSHAP values for positive class (diabetes = 1)\n\n\nCode\nshap_values_pos = shap_values[:, :, 1] # (n_samples, n_features)\nbase_value_pos = explainer.expected_value[1]\n\n\nGlobal SHAP bar plot: mean(|SHAP|)\n\n\nCode\nshap.summary_plot(\nshap_values_pos,\nX_train,\nplot_type=\"bar\",\nshow=True\n)\n\n\n\n\n\n\n\n\n\nGlobal SHAP beeswarm plot\n\n\nCode\nshap.summary_plot(\nshap_values_pos,\nX_train,\nshow=True\n)\n\n\n\n\n\n\n\n\n\n\nLocal explanation: force plot for one patient ————————-\n\n\n\nCode\ni = 0 # choose any index in X_test\nx_i = X_test.iloc[[i]] # 1-row DataFrame\nshap_values_i = explainer.shap_values(x_i) # shape: (1, n_features, 2)\nphi_i_pos = shap_values_i[0, :, 1] # (n_features,)\nshap.initjs()\nshap.force_plot(\nbase_value_pos, # baseline for class 1\nphi_i_pos, # SHAP values for this instance, class 1\nx_i # feature values for this instance\n)\n\n\n\n\n\n\n\n\n  Visualization omitted, Javascript library not loaded!\n  Have you run `initjs()` in this notebook? If this notebook was from another\n  user you must also trust this notebook (File -&gt; Trust notebook). If you are viewing\n  this notebook on github the Javascript has been stripped for security. If you are using\n  JupyterLab this error is because a JupyterLab extension has not yet been written.",
+    "crumbs": [
+      "Explainable AI",
+      "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)"
+    ]
+  },
+  {
+    "objectID": "pima_rf_shap_pyth_example.html#shap-values-with-treeexplainer",
+    "href": "pima_rf_shap_pyth_example.html#shap-values-with-treeexplainer",
+    "title": "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)",
+    "section": "5. SHAP values with TreeExplainer",
+    "text": "5. SHAP values with TreeExplainer\nSHAP provides local (per‑instance) and global explanations. For tree models, TreeExplainer gives an efficient way to compute exact Shapley values.\nThis visualises how each feature for this patient pushes the prediction away from the baseline towards the final diabetes risk estimate.\n\nYou now have:\n\nRandom Forest VIP via feature_importances_.\nSHAP‑based global importance and summary plots.\nA template for local SHAP explanations on individual patients.",
+    "crumbs": [
+      "Explainable AI",
+      "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)"
+    ]
+  },
+  {
+    "objectID": "pima_rf_shap_pyth_example.html#simple-linear-model-coefficients-as-a-basic-importance-measure",
+    "href": "pima_rf_shap_pyth_example.html#simple-linear-model-coefficients-as-a-basic-importance-measure",
+    "title": "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)",
+    "section": "7. Simple linear model: coefficients as a basic importance measure",
+    "text": "7. Simple linear model: coefficients as a basic importance measure\nFor comparison with Random Forest VIP and SHAP, we can also fit a simple linear model and look directly at the coefficients.\nHere we use LogisticRegression (a linear model for binary outcomes).\n\n\nCode\nfrom sklearn.linear_model import LogisticRegression\n\nlog_reg = LogisticRegression(max_iter=1000, solver=\"liblinear\")\n\nlog_reg.fit(X_train, y_train)\n\ncoef = pd.Series(log_reg.coef_[0], index=feature_names).sort_values(ascending=True)\nintercept = log_reg.intercept_[0]\n\nprint(\"Intercept (log-odds):\", intercept)\ncoef\n\n\nIntercept (log-odds): -5.139173453735531\n\n\nBloodPressure              -0.016591\nAge                        -0.004263\nInsulin                    -0.001002\nSkinThickness               0.003168\nGlucose                     0.028599\nBMI                         0.052319\nPregnancies                 0.103459\nDiabetesPedigreeFunction    0.438885\ndtype: float64\n\n\nPositive coefficients mean that higher values of the feature increase the log-odds of diabetes,\nnegative coefficients mean they decrease the log-odds.\nWe can also visualise these coefficients:\n\n\nCode\nplt.figure(figsize=(6, 4))\ncoef.plot(kind=\"barh\")\nplt.xlabel(\"Coefficient (log-odds scale)\")\nplt.title(\"Logistic Regression Coefficients (Pima Indians)\")\nplt.tight_layout()\nplt.show()\n\n\n\n\n\n\n\n\n\nThis provides a very simple, fully interpretable baseline to compare with:\n\nLogistic regression coefficients (linear, global, easy to interpret but may be too simplistic).\nRandom Forest VIP (nonlinear model, impurity-based importance).\nSHAP values (local and global feature attributions consistent with the model’s behaviour).",
+    "crumbs": [
+      "Explainable AI",
+      "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)"
+    ]
+  },
+  {
+    "objectID": "DALEX_tidymodels_example.html",
+    "href": "DALEX_tidymodels_example.html",
+    "title": "",
+    "section": "",
+    "text": "Code",
+    "crumbs": [
+      "Explainable AI"
+    ]
+  },
+  {
+    "objectID": "DALEX_tidymodels_example.html#explainable-ai",
+    "href": "DALEX_tidymodels_example.html#explainable-ai",
+    "title": "",
+    "section": "Explainable AI",
+    "text": "Explainable AI\nYou are going to see the power of the DALEX package https://github.com/ModelOriented/DALEX, where the methods seen in class AND MORE, are encoded.\nFirst, make sure you have the packages installed:\n\n# Install required packages\n#install.packages(c(\"tidymodels\", \"mlbench\", \"DALEX\", \"DALEXtra\", \"modelStudio\"))\n\nNow load them into our session:\n\nlibrary(tidymodels)\n\nWarning: package 'ggplot2' was built under R version 4.5.2\n\nlibrary(mlbench)\nlibrary(DALEX)\nlibrary(DALEXtra)\nlibrary(modelStudio)\n\nNow we are going to fit a random forest model (black box) on our well known PimaIndiansDiabetes dataset. We want to predict diabetes, so we are building a classification predictive model.\n\n# Load and prepare data\ndata(\"PimaIndiansDiabetes\")\n\nPimaIndiansDiabetes &lt;- PimaIndiansDiabetes %&gt;%\n       mutate(diabetes = as.factor(ifelse(diabetes == \"pos\", 1, 0)))\n\nClassic train test split:\n\nset.seed(123)\n\ndata_split &lt;- initial_split(PimaIndiansDiabetes, prop = 0.8)\ntrain_data &lt;- training(data_split)\ntest_data &lt;- testing(data_split)\n\nPre-processing\n\n# Define recipe and model\ndiabetes_recipe &lt;- recipe(diabetes ~ ., data = train_data) %&gt;%\n  step_normalize(all_numeric()) \n\nModel fitting (no hyperparameter tuning here)\n\nrf_model &lt;- rand_forest(mtry = 3, trees = 500, min_n = 10) %&gt;%\n  set_engine(\"ranger\") %&gt;%\n  set_mode(\"classification\")\n\n# Create and fit workflow\nrf_workflow &lt;- workflow() %&gt;%\n  add_recipe(diabetes_recipe) %&gt;%\n  add_model(rf_model)\n\nrf_fit &lt;- fit(rf_workflow, data = train_data)\n\nEvaluate model on test set\n\nrf_predictions &lt;- predict(rf_fit, new_data = test_data, type = \"prob\") %&gt;%\n  bind_cols(predict(rf_fit, new_data = test_data)) %&gt;%\n  bind_cols(test_data)\n\nmetrics &lt;- rf_predictions %&gt;%\n  metrics(truth = diabetes, estimate = .pred_class)\n\nprint(metrics)\n\n# A tibble: 2 × 3\n  .metric  .estimator .estimate\n  &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;\n1 accuracy binary         0.792\n2 kap      binary         0.517\n\n\nAnd now, lets start with XAI. We are going to use the DALEX package. As it is so useful, there is an integration with tidymodels https://www.tmwr.org/explain.html\nDALEX Explainer\n\nexplainer &lt;- explain_tidymodels(\n  rf_fit,\n  data = test_data %&gt;% select(-diabetes),\n  y = as.numeric(test_data$diabetes),\n  label = \"Random Forest (tidymodels)\"\n)\n\nPreparation of a new explainer is initiated\n  -&gt; model label       :  Random Forest (tidymodels) \n  -&gt; data              :  154  rows  8  cols \n  -&gt; target variable   :  154  values \n  -&gt; predict function  :  yhat.workflow  will be used (  default  )\n  -&gt; predicted values  :  No value for predict function target column. (  default  )\n  -&gt; model_info        :  package tidymodels , ver. 1.4.1 , task classification (  default  ) \n  -&gt; predicted values  :  numerical, min =  0.002366667 , mean =  0.3276443 , max =  0.8845706  \n  -&gt; residual function :  difference between y and yhat (  default  )\n  -&gt; residuals         :  numerical, min =  0.1509468 , mean =  1.010018 , max =  1.906288  \n  A new explainer has been created!  \n\n\nNow that we have fit the explainer, we can ask for specific methods to be assessed. For instance:\nFeature Importance: global\n\nplot(model_parts(explainer))\n\nWarning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.\nℹ Please use `linewidth` instead.\nℹ The deprecated feature was likely used in the ingredients package.\n  Please report the issue at\n  &lt;https://github.com/ModelOriented/ingredients/issues&gt;.\n\n\n\n\n\n\n\n\nPartial Dependence Plots\n\nplot(model_profile(explainer, variable =  \"glucose\", type = \"partial\"))\n\n\n\n\n\n\n\n\nglucose &lt;- model_profile(explainer, variable =  \"glucose\", type = \"partial\")\npedigree &lt;- model_profile(explainer, variable =  \"pedigree\", type = \"partial\")\n\nplot(glucose, pedigree)\n\nWarning: `aes_string()` was deprecated in ggplot2 3.0.0.\nℹ Please use tidy evaluation idioms with `aes()`.\nℹ See also `vignette(\"ggplot2-in-packages\")` for more information.\nℹ The deprecated feature was likely used in the ingredients package.\n  Please report the issue at\n  &lt;https://github.com/ModelOriented/ingredients/issues&gt;.\n\n\n\n\n\n\n\n\nPartial Dependence plots with ICE!\n\nplot(glucose, geom = \"profiles\") + \n    ggtitle(\"Ceteris-paribus and partial-dependence profiles for glucose\") \n\n\n\n\n\n\n\nWe can also look at local explanations by picking a single observation. In this case we are wanting to understand the prediction for this single observation through SHAPLEY values.\nThe specific observation is:\n\nnew_observation &lt;- test_data[1, -ncol(test_data)]\nprint(new_observation)\n\n  pregnant glucose pressure triceps insulin mass pedigree age\n1        6     148       72      35       0 33.6    0.627  50\n\n\nShapley:\n\nnew_observation &lt;- test_data[1, -ncol(test_data)]\nlocal_explanation &lt;- predict_parts(explainer, new_observation, type = \"shap\")\nplot(local_explanation)\n\n\n\n\n\n\n\nWant everything together? Try this out! A summary of everything!\n\n#modelStudio(explainer)\n\nBut we also have other packages. For example here we can find global variable importance taking advantage of the out of bag (OOB) error we can calculate in random forest (model specific approach)\n\nlibrary(vip)\n\n\nAttaching package: 'vip'\n\n\nThe following object is masked from 'package:DALEX':\n\n    titanic\n\n\nThe following object is masked from 'package:utils':\n\n    vi\n\n\nLets refit the model, but with importance = \"impurity\") in set_engine\n\n# Define recipe and model\ndiabetes_recipe &lt;- recipe(diabetes ~ ., data = train_data) %&gt;%\n  step_normalize(all_numeric())\n\nrf_model &lt;- rand_forest(mtry = 3, trees = 500, min_n = 10) %&gt;%\n set_engine(\"ranger\", importance = \"impurity\") %&gt;%\n  set_mode(\"classification\")\n\n# Create and fit workflow\nrf_workflow &lt;- workflow() %&gt;%\n  add_recipe(diabetes_recipe) %&gt;%\n  add_model(rf_model)\n\nrf_fit &lt;- fit(rf_workflow, data = train_data)\n\n\nrf_model_fitted &lt;- extract_fit_parsnip(rf_fit)$fit\n\n# Use vip to plot variable importance\nvip(rf_model_fitted, num_features = 10)\n\n\n\n\n\n\n\nNow uncomment the ModelStudio chunk and see what happens. Be sure to check this out too https://arena.drwhy.ai/?app And for python DALEX is also available: https://arena.drwhy.ai/docs/guide/installation",
+    "crumbs": [
+      "Explainable AI"
+    ]
+  },
+  {
+    "objectID": "Extra.html",
+    "href": "Extra.html",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "",
+    "text": "For a bit more insight, you can go through this tutorial obtained from here: https://github.com/ModelOriented/DALEX-docs/blob/master/vignettes/Comparison%20between%20breakdown%2C%20lime%2C%20shapley.Rmd Should take 2 mins to run.\nIn the vignette below we will see how methods implemented in DALEX R packages focuses on variables in selected model. For our model we consider Break Down, LIME and Shapley values.\nlibrary(DALEX)\nlibrary(lime)\nlibrary(randomForest)",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#break-down",
+    "href": "Extra.html#break-down",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "Break Down",
+    "text": "Break Down\nBreak Down is the methodology delevoped by Przemysław Biecek and Mateusz Staniak. A description of the method can be found here.\nThis methodology is implemented by Przemysław Biecek and Mateusz Staniak in the R package breakDown. Currently available in the R package DALEX.\nThe breakDown package is a model agnostic tool for decomposition of predictions from black boxes. Break Down Table shows contributions of every variable to a final prediction. Break Down Profile presents variable contributions in a concise graphical way.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#lime-local-interpretable-model-agnostic-explanations",
+    "href": "Extra.html#lime-local-interpretable-model-agnostic-explanations",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "LIME (Local Interpretable Model-agnostic Explanations)",
+    "text": "LIME (Local Interpretable Model-agnostic Explanations)\nLIME is the methodology developed by Marco Tulio Ribeiro, Sameer Singh, and Carlos Guestrin. A description of the method can be found here.\nThe purpose of LIME is to explain the predictions of black box classifiers. What this means is that for any given prediction and any given classifier it is able to determine a small set of features in the original data that has driven the outcome of the prediction. Using here package lime is an R port of the Python lime package (https://github.com/marcotcr/lime) developed by the authors of the lime approach for black-box model explanations.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#shapley-value",
+    "href": "Extra.html#shapley-value",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "Shapley value",
+    "text": "Shapley value\nA methodology based on the use of Shapley value known from game theory to explain predictions is developed by Scott Lundberg and Su-In Lee. A description of the method can be found here.\nThe Shapley value is a method that gives a solution to the following problem: A coalition of players play a game, for which they get a payout, but it is not clear how to distribute the payout fairly among the players. The Shapley value solves this problem by trying out different coalitions of players to decide how much each player changes the amount of the payout. What does this have to do with machine learning? In machine learning, the features (= players) work together to get the payout (=predicted value). The Shapley value tells us, how much each feature contributed to the prediction.\nWe use Shapley value implementation in the R package DALEX.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2--1",
+    "href": "Extra.html#x1--1-x2--1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = -1",
+    "text": "x1 = -1, x2 = -1\nExplainers\n\nnew_observation_1 &lt;- data.frame(x1 = -1, x2 = -1)\n\ndf_test &lt;- rbind(df_test, data.frame(y1 = sign(-1) + sign(-1) + rnorm(1) , y2 = sign(-1)*sign(-1) + rnorm(1), x1 = -1, x2 = -1),  data.frame(y1 = sign(-1) + sign(1) + rnorm(1) , y2 = sign(-1)*sign(1) + rnorm(1), x1 = -1, x2 = 1),\n                 data.frame(y1 = sign(0) + sign(0) + rnorm(1) , y2 = sign(0)*sign(0) + rnorm(1), x1 = 0, x2 = 0))\n\nbd_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_1, type = \"break_down\")\n\nexplainer &lt;- lime(df_train[,-c(1,2)], regr_rf_y1)\nlime_new_observation_1 &lt;- lime::explain(new_observation_1, explainer, n_features = 2)\n\nsh_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_1, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_1)\n\n\n\n\n\n\nplot_features(lime_new_observation_1)\n\n\n\n\n\n\nlime_new_observation_1\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1        0.301           0.260            -2.06 x1     \n2 regression 1        0.301           0.260            -2.06 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_1)\n\n\n\n\n\n\n\nWe see that in all methods both, x1 and x2 contradicts the predicted value of y1.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2-1",
+    "href": "Extra.html#x1--1-x2-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = 1",
+    "text": "x1 = -1, x2 = 1\nExplainers\n\nnew_observation_2 &lt;- data.frame(x1 = -1, x2 = 1)\n\nbd_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_2, type = \"break_down\")\n\nlime_new_observation_2 &lt;- lime::explain(new_observation_2, explainer, n_features = 2)\n\nsh_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_2, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_2)\n\n\n\n\n\n\nplot_features(lime_new_observation_2)\n\n\n\n\n\n\nlime_new_observation_2\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1        0.168           0.441            0.288 x1     \n2 regression 1        0.168           0.441            0.288 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_2)\n\n\n\n\n\n\n\nFor all methods we see that variable x1 contradicts the prediction and x2 supports it.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1-0-x2-0",
+    "href": "Extra.html#x1-0-x2-0",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = 0, x2 = 0",
+    "text": "x1 = 0, x2 = 0\nExplainers\n\nnew_observation_3 &lt;- data.frame(x1 = 0, x2 = 0)\n\nbd_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_3, type = \"break_down\")\n\nlime_new_observation_3 &lt;- lime::explain(new_observation_3, explainer, n_features = 2)\n\nsh_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_3, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_3)\n\n\n\n\n\n\nplot_features(lime_new_observation_3)\n\n\n\n\n\n\nlime_new_observation_3\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1        0.306          -0.733             1.86 x1     \n2 regression 1        0.306          -0.733             1.86 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_3)\n\n\n\n\n\n\n\nFor Break Down and Shapley value we see that both variables contradicts the prediction, but in LIME method we see that both variables support the value of y1.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2--1-1",
+    "href": "Extra.html#x1--1-x2--1-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = -1",
+    "text": "x1 = -1, x2 = -1\nExplainers\n\nnew_observation_1 &lt;- data.frame(x1 = -1, x2 = -1)\n\nbd_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_1, type = \"break_down\")\n\nexplainer &lt;- lime(df_train[,-c(1,2)], regr_rf_y2)\nlime_new_observation_1 &lt;- lime::explain(new_observation_1, explainer, n_features = 2)\n\nsh_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_1, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_1)\n\n\n\n\n\n\nplot_features(lime_new_observation_1)\n\n\n\n\n\n\nlime_new_observation_1\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1       0.0415          -0.239            0.367 x1     \n2 regression 1       0.0415          -0.239            0.367 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_1)\n\n\n\n\n\n\n\nWe see that in LIME and Shapley value x1 and x2 support the predicted value of y2. In Break Down x1 supports and x2 contradicts prediction.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2-1-1",
+    "href": "Extra.html#x1--1-x2-1-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = 1",
+    "text": "x1 = -1, x2 = 1\nExplainers\n\nnew_observation_2 &lt;- data.frame(x1 = -1, x2 = 1)\n\nbd_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_2, type = \"break_down\")\n\nlime_new_observation_2 &lt;- lime::explain(new_observation_2, explainer, n_features = 2)\n\nsh_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_2, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_2)\n\n\n\n\n\n\nplot_features(lime_new_observation_2)\n\n\n\n\n\n\nlime_new_observation_2\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1       0.0166          0.0878           -0.622 x1     \n2 regression 1       0.0166          0.0878           -0.622 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_2)\n\n\n\n\n\n\n\nFor all methods we see that both variables contradict the prediction.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1-0-x2-0-1",
+    "href": "Extra.html#x1-0-x2-0-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = 0, x2 = 0",
+    "text": "x1 = 0, x2 = 0\nExplainers\n\nnew_observation_3 &lt;- data.frame(x1 = 0, x2 = 0)\n\nbd_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_3, type = \"break_down\")\n\nlime_new_observation_3 &lt;- lime::explain(new_observation_3, explainer, n_features = 2)\n\nsh_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_3, type = \"shap\")\n\nComparison\n\nplot(bd_new_observation_3)\n\n\n\n\n\n\nplot_features(lime_new_observation_3)\n\n\n\n\n\n\nlime_new_observation_3\n\n# A tibble: 2 × 11\n  model_type case  model_r2 model_intercept model_prediction feature\n  &lt;chr&gt;      &lt;chr&gt;    &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt; &lt;chr&gt;  \n1 regression 1      0.00291          0.0170           -0.113 x1     \n2 regression 1      0.00291          0.0170           -0.113 x2     \n# ℹ 5 more variables: feature_value &lt;dbl&gt;, feature_weight &lt;dbl&gt;,\n#   feature_desc &lt;chr&gt;, data &lt;list&gt;, prediction &lt;dbl&gt;\n\nplot(sh_new_observation_3)\n\n\n\n\n\n\n\nFor Break Down and Shapley values we see that both variables support the prediction, but in LIME method we see that both variables contradict the value of y2.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#break-down-1",
+    "href": "Extra.html#break-down-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "Break Down",
+    "text": "Break Down\nBreak Down is the methodology delevoped by Przemysław Biecek and Mateusz Staniak. A description of the method can be found here.\nThis methodology is implemented by Przemysław Biecek and Mateusz Staniak in the R package breakDown. Currently available in the R package DALEX.\nThe breakDown package is a model agnostic tool for decomposition of predictions from black boxes. Break Down Table shows contributions of every variable to a final prediction. Break Down Profile presents variable contributions in a concise graphical way.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#lime-local-interpretable-model-agnostic-explanations-1",
+    "href": "Extra.html#lime-local-interpretable-model-agnostic-explanations-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "LIME (Local Interpretable Model-agnostic Explanations)",
+    "text": "LIME (Local Interpretable Model-agnostic Explanations)\nLIME is the methodology developed by Marco Tulio Ribeiro, Sameer Singh, and Carlos Guestrin. A description of the method can be found here.\nThe purpose of LIME is to explain the predictions of black box classifiers. What this means is that for any given prediction and any given classifier it is able to determine a small set of features in the original data that has driven the outcome of the prediction. Using here package lime is an R port of the Python lime package (https://github.com/marcotcr/lime) developed by the authors of the lime approach for black-box model explanations.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#shapley-value-1",
+    "href": "Extra.html#shapley-value-1",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "Shapley value",
+    "text": "Shapley value\nA methodology based on the use of Shapley value known from game theory to explain predictions is developed by Scott Lundberg and Su-In Lee. A description of the method can be found here.\nThe Shapley value is a method that gives a solution to the following problem: A coalition of players play a game, for which they get a payout, but it is not clear how to distribute the payout fairly among the players. The Shapley value solves this problem by trying out different coalitions of players to decide how much each player changes the amount of the payout. What does this have to do with machine learning? In machine learning, the features (= players) work together to get the payout (=predicted value). The Shapley value tells us, how much each feature contributed to the prediction.\nWe use Shapley value implementation in the R package DALEX.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2--1-2",
+    "href": "Extra.html#x1--1-x2--1-2",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = -1",
+    "text": "x1 = -1, x2 = -1\nExplainers\nquarto-executable-code-5450563D\nnew_observation_1 &lt;- data.frame(x1 = -1, x2 = -1)\n\ndf_test &lt;- rbind(df_test, data.frame(y1 = sign(-1) + sign(-1) + rnorm(1) , y2 = sign(-1)*sign(-1) + rnorm(1), x1 = -1, x2 = -1),  data.frame(y1 = sign(-1) + sign(1) + rnorm(1) , y2 = sign(-1)*sign(1) + rnorm(1), x1 = -1, x2 = 1),\n                 data.frame(y1 = sign(0) + sign(0) + rnorm(1) , y2 = sign(0)*sign(0) + rnorm(1), x1 = 0, x2 = 0))\n\nbd_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_1, type = \"break_down\")\n\nexplainer &lt;- lime(df_train[,-c(1,2)], regr_rf_y1)\nlime_new_observation_1 &lt;- lime::explain(new_observation_1, explainer, n_features = 2)\n\nsh_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_1, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_1)\nplot_features(lime_new_observation_1)\nlime_new_observation_1\nplot(sh_new_observation_1)\nWe see that in all methods both, x1 and x2 contradicts the predicted value of y1.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2-1-2",
+    "href": "Extra.html#x1--1-x2-1-2",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = 1",
+    "text": "x1 = -1, x2 = 1\nExplainers\nquarto-executable-code-5450563D\nnew_observation_2 &lt;- data.frame(x1 = -1, x2 = 1)\n\nbd_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_2, type = \"break_down\")\n\nlime_new_observation_2 &lt;- lime::explain(new_observation_2, explainer, n_features = 2)\n\nsh_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_2, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_2)\nplot_features(lime_new_observation_2)\nlime_new_observation_2\nplot(sh_new_observation_2)\nFor all methods we see that variable x1 contradicts the prediction and x2 supports it.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1-0-x2-0-2",
+    "href": "Extra.html#x1-0-x2-0-2",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = 0, x2 = 0",
+    "text": "x1 = 0, x2 = 0\nExplainers\nquarto-executable-code-5450563D\nnew_observation_3 &lt;- data.frame(x1 = 0, x2 = 0)\n\nbd_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_3, type = \"break_down\")\n\nlime_new_observation_3 &lt;- lime::explain(new_observation_3, explainer, n_features = 2)\n\nsh_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y1, new_observation_3, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_3)\nplot_features(lime_new_observation_3)\nlime_new_observation_3\nplot(sh_new_observation_3)\nFor Break Down and Shapley value we see that both variables contradicts the prediction, but in LIME method we see that both variables support the value of y1.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2--1-3",
+    "href": "Extra.html#x1--1-x2--1-3",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = -1",
+    "text": "x1 = -1, x2 = -1\nExplainers\nquarto-executable-code-5450563D\nnew_observation_1 &lt;- data.frame(x1 = -1, x2 = -1)\n\nbd_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_1, type = \"break_down\")\n\nexplainer &lt;- lime(df_train[,-c(1,2)], regr_rf_y2)\nlime_new_observation_1 &lt;- lime::explain(new_observation_1, explainer, n_features = 2)\n\nsh_new_observation_1 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_1, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_1)\nplot_features(lime_new_observation_1)\nlime_new_observation_1\nplot(sh_new_observation_1)\nWe see that in LIME and Shapley value x1 and x2 support the predicted value of y2. In Break Down x1 supports and x2 contradicts prediction.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1--1-x2-1-3",
+    "href": "Extra.html#x1--1-x2-1-3",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = -1, x2 = 1",
+    "text": "x1 = -1, x2 = 1\nExplainers\nquarto-executable-code-5450563D\nnew_observation_2 &lt;- data.frame(x1 = -1, x2 = 1)\n\nbd_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_2, type = \"break_down\")\n\nlime_new_observation_2 &lt;- lime::explain(new_observation_2, explainer, n_features = 2)\n\nsh_new_observation_2 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_2, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_2)\nplot_features(lime_new_observation_2)\nlime_new_observation_2\nplot(sh_new_observation_2)\nFor all methods we see that both variables contradict the prediction.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  },
+  {
+    "objectID": "Extra.html#x1-0-x2-0-3",
+    "href": "Extra.html#x1-0-x2-0-3",
+    "title": "Comparison of Break Down, LIME and Shapley values",
+    "section": "x1 = 0, x2 = 0",
+    "text": "x1 = 0, x2 = 0\nExplainers\nquarto-executable-code-5450563D\nnew_observation_3 &lt;- data.frame(x1 = 0, x2 = 0)\n\nbd_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_3, type = \"break_down\")\n\nlime_new_observation_3 &lt;- lime::explain(new_observation_3, explainer, n_features = 2)\n\nsh_new_observation_3 &lt;- predict_parts(explainer_regr_rf_y2, new_observation_3, type = \"shap\")\nComparison\nquarto-executable-code-5450563D\nplot(bd_new_observation_3)\nplot_features(lime_new_observation_3)\nlime_new_observation_3\nplot(sh_new_observation_3)\nFor Break Down and Shapley values we see that both variables support the prediction, but in LIME method we see that both variables contradict the value of y2.",
+    "crumbs": [
+      "Explainable AI",
+      "Comparison of Break Down, LIME and Shapley values"
+    ]
+  }
+]

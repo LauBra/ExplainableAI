@@ -1,0 +1,248 @@
+---
+title: "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Python)"
+format:
+  html:
+    code-fold: true
+jupyter: python3
+---
+
+## 1. Setup
+
+This document shows how to compute **Random Forest variable importance** and **SHAP values** for the Pima Indians Diabetes dataset using Python.
+
+We will:
+
+1. Load the dataset.
+2. Fit a `RandomForestClassifier`.
+3. Plot impurity-based variable importance (VIP).
+4. Use `shap` to compute and visualise SHAP values.
+
+
+```{r}
+library(reticulate)
+
+# one-off setup (if you haven't done it yet)
+# install_miniconda()
+
+##conda_create(
+##  envname = "hds-python",
+##  python_version = "3.11",
+##  packages = c("numpy", "pandas", "matplotlib", "seaborn", "scikit-learn")
+##)
+
+use_condaenv("hds-python", required = TRUE)
+#py_config()
+
+#conda_install("hds-python", c("shap"))
+```
+
+
+```{python}
+import pandas as pd
+import numpy as np
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_auc_score
+from sklearn.inspection import permutation_importance
+
+import matplotlib.pyplot as plt
+
+import shap
+```
+
+## 2. Load the Pima Indians Diabetes data
+
+We use a common version of the dataset from GitHub.
+
+```{python}
+url = "https://raw.githubusercontent.com/npradaschnor/Pima-Indians-Diabetes-Dataset/master/diabetes.csv"
+pima = pd.read_csv(url)
+
+pima.head()
+```
+
+The outcome column is called `Outcome` (1 = diabetes, 0 = no diabetes).
+
+```{python}
+X = pima.drop(columns=["Outcome"])
+y = pima["Outcome"]
+
+feature_names = X.columns.tolist()
+```
+
+## 3. Train / test split and Random Forest model
+
+```{python}
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=123, stratify=y
+)
+
+rf = RandomForestClassifier(
+    n_estimators=300,
+    max_depth=None,
+    random_state=123,
+    n_jobs=-1
+)
+
+rf.fit(X_train, y_train)
+
+y_pred_proba = rf.predict_proba(X_test)[:, 1]
+auc = roc_auc_score(y_test, y_pred_proba)
+auc
+```
+
+## 4. Random Forest Variable Importance (impurity-based)
+
+Here we use the standard `feature_importances_` attribute from scikit-learn, which reflects the average decrease in Gini impurity contributed by each feature.
+
+```{python}
+importances = rf.feature_importances_
+vip = pd.Series(importances, index=feature_names).sort_values(ascending=True)
+
+plt.figure(figsize=(6, 4))
+vip.plot(kind="barh")
+plt.xlabel("Mean decrease in impurity")
+plt.title("Random Forest Variable Importance (Pima Indians)")
+plt.tight_layout()
+plt.show()
+```
+
+
+```{python}
+result = permutation_importance(
+rf,
+X_test,
+y_test,
+n_repeats=20,
+random_state=123,
+scoring="roc_auc",
+n_jobs=-1
+)
+
+
+perm_importance = pd.Series(
+result.importances_mean,
+index=feature_names
+).sort_values(ascending=True)
+display(perm_importance)
+perm_importance.plot(kind="barh")
+plt.xlabel("Mean decrease in ROC AUC\n(permuting each feature on test set)")
+plt.title("Permutation Importance (Random Forest)")
+plt.tight_layout()
+plt.show()
+```
+
+
+5. SHAP values with TreeExplainer (new 3D API) ---------------------------
+
+```{python}
+
+
+explainer = shap.TreeExplainer(rf)
+shap_values = explainer.shap_values(X_train) # shape: (n_samples, n_features, n_outputs)
+print("shap_values.shape:", shap_values.shape)
+print("X_train.shape:", X_train.shape)
+print("expected_value:", explainer.expected_value)
+```
+SHAP values for positive class (diabetes = 1)
+
+```{python}
+
+
+
+shap_values_pos = shap_values[:, :, 1] # (n_samples, n_features)
+base_value_pos = explainer.expected_value[1]
+```
+
+Global SHAP bar plot: mean(|SHAP|)
+
+```{python}
+shap.summary_plot(
+shap_values_pos,
+X_train,
+plot_type="bar",
+show=True
+)
+```
+
+Global SHAP beeswarm plot
+```{python}
+shap.summary_plot(
+shap_values_pos,
+X_train,
+show=True
+)
+```
+
+6. Local explanation: force plot for one patient -------------------------
+```{python}
+
+i = 0 # choose any index in X_test
+x_i = X_test.iloc[[i]] # 1-row DataFrame
+shap_values_i = explainer.shap_values(x_i) # shape: (1, n_features, 2)
+phi_i_pos = shap_values_i[0, :, 1] # (n_features,)
+shap.initjs()
+shap.force_plot(
+base_value_pos, # baseline for class 1
+phi_i_pos, # SHAP values for this instance, class 1
+x_i # feature values for this instance
+)
+```
+
+
+
+
+## 5. SHAP values with TreeExplainer
+
+SHAP provides local (per‑instance) and global explanations. For tree models, `TreeExplainer` gives an efficient way to compute exact Shapley values.
+
+This visualises how each feature for this patient pushes the prediction away from the baseline towards the final diabetes risk estimate.
+
+---
+
+You now have:
+
+- **Random Forest VIP** via `feature_importances_`.
+- **SHAP‑based global importance** and **summary plots**.
+- A template for **local SHAP explanations** on individual patients.
+
+## 7. Simple linear model: coefficients as a basic importance measure
+
+For comparison with Random Forest VIP and SHAP, we can also fit a **simple linear model** and look directly at the coefficients.  
+Here we use `LogisticRegression` (a linear model for binary outcomes).
+
+```{python}
+from sklearn.linear_model import LogisticRegression
+
+log_reg = LogisticRegression(max_iter=1000, solver="liblinear")
+
+log_reg.fit(X_train, y_train)
+
+coef = pd.Series(log_reg.coef_[0], index=feature_names).sort_values(ascending=True)
+intercept = log_reg.intercept_[0]
+
+print("Intercept (log-odds):", intercept)
+coef
+```
+
+Positive coefficients mean that higher values of the feature **increase** the log-odds of diabetes,  
+negative coefficients mean they **decrease** the log-odds.
+
+We can also visualise these coefficients:
+
+```{python}
+plt.figure(figsize=(6, 4))
+coef.plot(kind="barh")
+plt.xlabel("Coefficient (log-odds scale)")
+plt.title("Logistic Regression Coefficients (Pima Indians)")
+plt.tight_layout()
+plt.show()
+```
+
+This provides a very simple, fully interpretable baseline to compare with:
+
+- **Logistic regression coefficients** (linear, global, easy to interpret but may be too simplistic).
+- **Random Forest VIP** (nonlinear model, impurity-based importance).
+- **SHAP values** (local and global feature attributions consistent with the model's behaviour).
+

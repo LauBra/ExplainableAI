@@ -25,6 +25,7 @@ website:
       contents:
         - DALEX_tidymodels_example.qmd
         - Extra.qmd 
+        - pima_rf_shap_pyth_example.qmd
   
   page-footer: 
     left: "Copyright 2024, Laura Bravo" 
