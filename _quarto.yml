@@ -2,7 +2,8 @@ project:
   type: website
   output-dir: docs    # <- add / change this line
   render: 
-  - "*.qmd"
+  - DALEX_tidymodels_example.qmd
+  - Random_Forest_SHAP_Analysis.qmd
 
 execute:
   echo: true
@@ -23,18 +24,14 @@ website:
   sidebar:
     - title: "Explainable AI"
       contents:
+        #- Extra.qmd 
+        - Random_Forest_SHAP_Analysis.qmd
         - DALEX_tidymodels_example.qmd
-        - Extra.qmd 
-        - pima_rf_shap_pyth_example.qmd
   
   page-footer: 
-    left: "Copyright 2024, Laura Bravo" 
+    left: "Copyright 2025, Laura Bravo" 
     background: light
-    right: 
-      - icon: twitter 
-        href: https://twitter.com/laura_bravo94
-      - icon: github
-        href: https://github.com/LauBra/RIntro2023
+
     
 format:
   html:

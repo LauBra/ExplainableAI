@@ -3,7 +3,6 @@ title: "Random Forest Variable Importance and SHAP on Pima Indians Diabetes (Pyt
 format:
   html:
     code-fold: true
-jupyter: python3
 ---
 
 ## 1. Setup
@@ -18,7 +17,7 @@ We will:
 4. Use `shap` to compute and visualise SHAP values.
 
 
-```{r}
+```{r, include = FALSE}
 library(reticulate)
 
 # one-off setup (if you haven't done it yet)
@@ -125,7 +124,9 @@ perm_importance = pd.Series(
 result.importances_mean,
 index=feature_names
 ).sort_values(ascending=True)
-display(perm_importance)
+
+#display(perm_importance)
+
 perm_importance.plot(kind="barh")
 plt.xlabel("Mean decrease in ROC AUC\n(permuting each feature on test set)")
 plt.title("Permutation Importance (Random Forest)")
@@ -134,7 +135,7 @@ plt.show()
 ```
 
 
-5. SHAP values with TreeExplainer (new 3D API) ---------------------------
+5. SHAP values with TreeExplainer 
 
 ```{python}
 
@@ -180,9 +181,14 @@ show=True
 
 i = 0 # choose any index in X_test
 x_i = X_test.iloc[[i]] # 1-row DataFrame
+
 shap_values_i = explainer.shap_values(x_i) # shape: (1, n_features, 2)
 phi_i_pos = shap_values_i[0, :, 1] # (n_features,)
+
+
+
 shap.initjs()
+
 shap.force_plot(
 base_value_pos, # baseline for class 1
 phi_i_pos, # SHAP values for this instance, class 1
